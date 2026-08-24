@@ -4,8 +4,14 @@
 	"description": "Pi-agnostic business logic for agentic-harness: state machines, guardian decisions, quest/TDD domain model.",
 	"license": "MIT",
 	"type": "module",
-	"overrides": {
-		"google-auth-library": "$google-auth-library"
+	"packageManager": "pnpm@10.28.0",
+	"pnpm": {
+		"onlyBuiltDependencies": [
+			"sqlite3"
+		],
+		"overrides": {
+			"google-auth-library": "$google-auth-library"
+		}
 	},
 	"exports": {
 		"./tdd": "./dist/tdd/index.js",
@@ -105,11 +111,11 @@
 	],
 	"scripts": {
 		"build": "tsc -p tsconfig.build.json",
-		"prepare": "npm run build",
+		"prepare": "pnpm run build",
 		"lint": "biome check .",
 		"lint:fix": "biome check --write .",
 		"typecheck": "tsc --noEmit",
-		"pretest": "npm run build",
+		"pretest": "pnpm run build",
 		"test": "vitest run",
 		"test:watch": "vitest",
 		"test:browser": "vitest run --config vitest.browser.config.ts"

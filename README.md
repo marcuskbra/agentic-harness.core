@@ -44,9 +44,9 @@ relative to the current directory.
 ## Development
 
 ```sh
-npm install
-npm run build      # compiles src/ + bin/ to dist/
-npm test           # builds, then runs the vitest suite (unit + CLI)
-npm run typecheck
-npm run lint
+pnpm install
+pnpm run build      # compiles src/ + bin/ to dist/
+pnpm test           # builds, then runs the vitest suite (unit + CLI)
+pnpm run typecheck
+pnpm run lint
 ```
