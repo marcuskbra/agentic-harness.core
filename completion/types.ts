@@ -49,7 +49,7 @@ export interface CompletionContext {
 /** Request auth resolved from the model registry. */
 export interface CompletionAuth {
 	readonly apiKey?: string;
-	readonly headers?: Record<string, string>;
+	readonly headers?: Record<string, string | null>;
 	readonly env?: Record<string, string>;
 }
 
@@ -85,7 +85,8 @@ export interface CompletionRegistry {
 		| {
 				ok: true;
 				apiKey?: string;
-				headers?: Record<string, string>;
+				headers?: Record<string, string | null>;
+				baseUrl?: string;
 				env?: Record<string, string>;
 		  }
 		| { ok: false; error: string }
