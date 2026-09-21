@@ -114,11 +114,11 @@
 	],
 	"scripts": {
 		"build": "tsc -p tsconfig.build.json",
-		"prepare": "tsc -p tsconfig.build.json",
+		"prepare": "pnpm run build",
 		"lint": "biome check .",
 		"lint:fix": "biome check --write .",
 		"typecheck": "tsc --noEmit",
-		"pretest": "tsc -p tsconfig.build.json",
+		"pretest": "pnpm run build",
 		"test": "vitest run",
 		"test:watch": "vitest",
 		"test:browser": "vitest run --config vitest.browser.config.ts"
