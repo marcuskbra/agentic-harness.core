@@ -204,6 +204,8 @@ import {
 	enabledRules,
 	foldBehind,
 	foldPair,
+	MOTION_CAPTURE,
+	type MotionCapture,
 	type PageBox,
 	type PaintedSide,
 	type PairReport,
@@ -215,7 +217,12 @@ import {
 	type VisualNode,
 	visualCaptureSource,
 } from "./audit/index.js";
-import { inventorySource, type StyleSample } from "./design/index.js";
+import {
+	inventorySource,
+	type StyleSample,
+	type TextBlock,
+	TYPOGRAPHY_CAPTURE,
+} from "./design/index.js";
 import {
 	describeThrow,
 	type EvalFrame,
@@ -223,6 +230,7 @@ import {
 	type EvalValue,
 	evaluationSource,
 } from "./evaluate/index.js";
+import { HYDRATION_CAPTURE, type HydrationCapture } from "./hydration/index.js";
 import {
 	categoriesFor,
 	compareHeap,
@@ -2469,6 +2477,39 @@ export class BrowserSession {
 		return result.value as FocusHolder | undefined;
 	}
 
+	/**
+	 * What the page keeps doing when asked to hold still.
+	 *
+	 * Emulates prefers-reduced-motion: reduce, reloads so the page
+	 * decides its motion under the preference rather than being
+	 * caught mid-flight, reads what is still moving, then puts the
+	 * emulation back exactly as it was. The reload matters: a page
+	 * picks most of its motion at load, so flipping the preference
+	 * on a settled page measures its reaction to a change, not its
+	 * behaviour for a visitor who arrived with the preference set.
+	 */
+	async motionUnderReduce(): Promise<MotionCapture> {
+		await this.ready();
+		const before = this.emulation.asked;
+		try {
+			await this.emulation.change({ reducedMotion: true });
+			await this.reload();
+			const response = await this.cdp.send("Runtime.evaluate", {
+				expression: MOTION_CAPTURE,
+				returnByValue: true,
+			});
+			if (response.exceptionDetails) {
+				const threw = describeThrow(response.exceptionDetails);
+				throw new Error(`Could not read the motion: ${threw.message}`);
+			}
+			return response.result.value as MotionCapture;
+		} finally {
+			// Wholesale, not merged: a merge cannot clear the reduce
+			// this added when the session had no opinion before.
+			await this.emulation.restore(before);
+		}
+	}
+
 	async structure(): Promise<readonly StructureNode[]> {
 		// Every sibling read waits out a crash recovery first, and
 		// this one did not. Promise.all evaluates this.cdp.send when
@@ -2535,6 +2576,47 @@ export class BrowserSession {
 			throw new Error(`Could not measure the targets: ${threw.message}`);
 		}
 		return response.result.value as readonly CapturedTarget[];
+	}
+
+	/**
+	 * Both renders of the current page: what the server sends and
+	 * what hydration made of it.
+	 *
+	 * The server render is fetched from inside the page, so it
+	 * travels with the session's cookies, and parsed without
+	 * running a script. Judging the capture is the hydration
+	 * subdomain's job; pair it with logs() so the framework's own
+	 * complaints are read beside the comparison.
+	 */
+	async hydration(): Promise<HydrationCapture> {
+		await this.ready();
+		const response = await this.cdp.send("Runtime.evaluate", {
+			expression: HYDRATION_CAPTURE,
+			awaitPromise: true,
+			returnByValue: true,
+		});
+		if (response.exceptionDetails) {
+			const threw = describeThrow(response.exceptionDetails);
+			throw new Error(`Could not read the renders: ${threw.message}`);
+		}
+		return response.result.value as HydrationCapture;
+	}
+
+	/**
+	 * How the page's text blocks wrap, measured from real line
+	 * boxes rather than estimated from fonts.
+	 */
+	async typography(): Promise<readonly TextBlock[]> {
+		await this.ready();
+		const response = await this.cdp.send("Runtime.evaluate", {
+			expression: TYPOGRAPHY_CAPTURE,
+			returnByValue: true,
+		});
+		if (response.exceptionDetails) {
+			const threw = describeThrow(response.exceptionDetails);
+			throw new Error(`Could not measure the text: ${threw.message}`);
+		}
+		return response.result.value as readonly TextBlock[];
 	}
 
 	async layout(): Promise<{

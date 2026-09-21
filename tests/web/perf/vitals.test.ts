@@ -8,6 +8,7 @@ import { renderVitals } from "../../../web/perf/view.js";
 import {
 	cumulativeShift,
 	measure,
+	measureSamples,
 	rate,
 	type Shift,
 	THRESHOLDS,
@@ -313,6 +314,104 @@ describe("renderVitals", () => {
 	it("does not report a clean pass when nothing was measured", () => {
 		const out = renderVitals({ shifts: [], longTasks: [], paints: {} }, []);
 		expect(out.startsWith("WARN")).toBe(true);
+	});
+});
+
+describe("measureSamples", () => {
+	/** The fixture reloaded with a different largest paint time. */
+	const lcpAt = (time: number): Vitals => ({
+		...CAPTURE,
+		lcp: { time, size: 79296, element: "div.hero", url: null },
+	});
+
+	it("is measure exactly when there is one sample", () => {
+		expect(measureSamples([CAPTURE])).toEqual(measure(CAPTURE));
+	});
+
+	it("is empty when there are no samples", () => {
+		expect(measureSamples([])).toEqual([]);
+	});
+
+	it("takes the median of an odd count, not the mean", () => {
+		const measures = measureSamples([lcpAt(100), lcpAt(4000), lcpAt(200)]);
+		const lcp = measures.find((one) => one.name.includes("largest"));
+		// The mean of these is 1433; the median ignores the outlier.
+		expect(lcp?.value).toBe(200);
+	});
+
+	it("reports the spread beside the median", () => {
+		const measures = measureSamples([lcpAt(100), lcpAt(4000), lcpAt(200)]);
+		const lcp = measures.find((one) => one.name.includes("largest"));
+		expect(lcp?.spread).toEqual({
+			low: 100,
+			high: 4000,
+			samples: 3,
+			straddles: true,
+		});
+	});
+
+	it("calls a metric stable when every load rated it the same", () => {
+		const measures = measureSamples([lcpAt(100), lcpAt(300), lcpAt(200)]);
+		const lcp = measures.find((one) => one.name.includes("largest"));
+		expect(lcp?.spread?.straddles).toBe(false);
+	});
+
+	it("rates the median sample, so thresholds stay in one place", () => {
+		const measures = measureSamples([lcpAt(100), lcpAt(9000), lcpAt(3000)]);
+		const lcp = measures.find((one) => one.name.includes("largest"));
+		expect(lcp?.rating).toBe("needs-improvement");
+	});
+
+	it("stands on the worse middle for an even count", () => {
+		// Middles are 200 (good) and 3000 (needs-improvement); a tie
+		// broken toward good would hide the reading worth hearing
+		// about.
+		const measures = measureSamples([
+			lcpAt(100),
+			lcpAt(200),
+			lcpAt(3000),
+			lcpAt(4000),
+		]);
+		const lcp = measures.find((one) => one.name.includes("largest"));
+		expect(lcp?.value).toBe(1600);
+		expect(lcp?.rating).toBe("needs-improvement");
+	});
+
+	it("counts only the loads that reported a metric", () => {
+		const noLcp: Vitals = { ...CAPTURE, lcp: undefined };
+		const measures = measureSamples([lcpAt(100), noLcp, lcpAt(200)]);
+		const lcp = measures.find((one) => one.name.includes("largest"));
+		expect(lcp?.spread?.samples).toBe(2);
+	});
+});
+
+describe("renderVitals over samples", () => {
+	const lcpAt = (time: number): Vitals => ({
+		...CAPTURE,
+		shifts: [],
+		longTasks: [],
+		lcp: { time, size: 79296, element: "div.hero", url: null },
+	});
+
+	it("says the values are medians and over how many loads", () => {
+		const samples = [lcpAt(100), lcpAt(300), lcpAt(200)];
+		const out = renderVitals(lcpAt(200), measureSamples(samples));
+		expect(out).toContain("median of 3 loads");
+		expect(out).toContain("100 ms-300 ms over 3");
+	});
+
+	it("will not pass a metric whose rating straddled the loads", () => {
+		// Median good, worst poor: the instability is the finding.
+		const samples = [lcpAt(100), lcpAt(9000), lcpAt(200)];
+		const out = renderVitals(lcpAt(200), measureSamples(samples));
+		expect(out.startsWith("WARN")).toBe(true);
+		expect(out).toContain("Rated differently between loads");
+	});
+
+	it("passes a page that rated the same on every load", () => {
+		const samples = [lcpAt(100), lcpAt(300), lcpAt(200)];
+		const out = renderVitals(lcpAt(200), measureSamples(samples));
+		expect(out.startsWith("PASS")).toBe(true);
 	});
 });
 

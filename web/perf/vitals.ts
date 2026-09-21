@@ -168,6 +168,16 @@ export function worstShiftSources(
 		.slice(0, limit);
 }
 
+/** How a metric varied across repeated loads. */
+export interface Spread {
+	readonly low: number;
+	readonly high: number;
+	/** How many loads actually reported this metric. */
+	readonly samples: number;
+	/** Whether the rating differed between loads. */
+	readonly straddles: boolean;
+}
+
 /** One metric, rated. */
 export interface Measure {
 	readonly name: string;
@@ -176,6 +186,8 @@ export interface Measure {
 	readonly rating: Rating;
 	/** What the value points at, when the browser said. */
 	readonly detail?: string;
+	/** Present when the value is a median over several loads. */
+	readonly spread?: Spread;
 }
 
 /** Read the vitals into rated measures. */
@@ -253,3 +265,75 @@ export function measure(vitals: Vitals): readonly Measure[] {
 
 	return measures;
 }
+
+/**
+ * Read several captures of the same page into rated measures,
+ * one per metric, each the median over the loads that reported
+ * it.
+ *
+ * A single headless load drifts: the same page can rate good on
+ * one run and poor on the next without anything changing. The
+ * median is the defensible middle, and the spread is reported
+ * beside it because a rating that straddles the runs is the
+ * finding, not the number.
+ *
+ * The rating is taken from the sample nearest the median rather
+ * than re-derived, so a metric keeps exactly the thresholds
+ * `measure` gave it. For an even count the worse of the two
+ * middle samples decides, which errs toward the reading a
+ * person would want to hear about.
+ */
+export function measureSamples(samples: readonly Vitals[]): readonly Measure[] {
+	const first = samples[0];
+	if (first === undefined) return [];
+	if (samples.length === 1) return measure(first);
+
+	const order: string[] = [];
+	const byName = new Map<string, Measure[]>();
+	for (const capture of samples) {
+		for (const one of measure(capture)) {
+			const group = byName.get(one.name);
+			if (group === undefined) {
+				byName.set(one.name, [one]);
+				order.push(one.name);
+			} else {
+				group.push(one);
+			}
+		}
+	}
+
+	return order.map((name) => {
+		// Set above for every name in order; the map cannot miss.
+		const group = byName.get(name) as Measure[];
+		const sorted = [...group].sort((a, b) => a.value - b.value);
+		const mid = Math.floor(sorted.length / 2);
+		const upper = sorted[mid] as Measure;
+		const lower = sorted[Math.max(0, mid - 1)] as Measure;
+		const odd = sorted.length % 2 === 1;
+		const median = odd ? upper.value : (lower.value + upper.value) / 2;
+		const worseMiddle =
+			SEVERITY_ORDER.indexOf(lower.rating) >=
+			SEVERITY_ORDER.indexOf(upper.rating)
+				? lower
+				: upper;
+		const nearest = odd ? upper : worseMiddle;
+		const low = (sorted[0] as Measure).value;
+		const high = (sorted[sorted.length - 1] as Measure).value;
+		return {
+			name,
+			value: median,
+			unit: nearest.unit,
+			rating: nearest.rating,
+			...(nearest.detail === undefined ? {} : { detail: nearest.detail }),
+			spread: {
+				low,
+				high,
+				samples: group.length,
+				straddles: new Set(group.map((one) => one.rating)).size > 1,
+			},
+		};
+	});
+}
+
+/** Mildest to worst, for choosing the reading to stand on. */
+const SEVERITY_ORDER: readonly Rating[] = ["good", "needs-improvement", "poor"];

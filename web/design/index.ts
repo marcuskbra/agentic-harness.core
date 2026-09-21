@@ -25,3 +25,13 @@ export {
 	type Usage,
 } from "./inventory.js";
 export { inventorySource, SAMPLED_PROPERTIES } from "./probe.js";
+export {
+	analyseTypography,
+	BODY_FLOOR_CHARS,
+	RUNT_MAX_WORDS,
+	RUNT_WIDTH_SHARE,
+	renderTypography,
+	type TextBlock,
+	TYPOGRAPHY_CAPTURE,
+	type TypographyFinding,
+} from "./typography.js";

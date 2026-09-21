@@ -70,15 +70,31 @@ export function renderVitals(
 	// person to interact: nothing here observes event timing, so a
 	// reader told only that four were measured has no way to know
 	// responsiveness was never among them, and assumes it passed.
+	const sampled = Math.max(...measures.map((one) => one.spread?.samples ?? 1));
+	// A rating that changed between loads is the finding, not the
+	// median beside it: the median alone reads as settled.
+	const unstable = measures.filter((one) => one.spread?.straddles);
 	const caveat =
 		` Interaction to next paint is not among them: it needs an ` +
 		`interaction, and this measures a load.` +
+		(sampled <= 1 ? "" : ` Each value is the median of ${sampled} loads.`) +
+		(unstable.length === 0
+			? ""
+			: ` Rated differently between loads: ${unstable
+					.map((one) => one.name)
+					.join(", ")}.`) +
 		(missing.length === 0 ? "" : ` Not observed: ${missing.join("; ")}.`);
 	const width = Math.max(...measures.map((one) => one.name.length));
 	const lines = measures.map(
 		(one) =>
 			`  ${one.name.padEnd(width)}  ${MARK[one.rating].padEnd(4)}  ` +
 			`${say(one.value, one.unit).padStart(9)}` +
+			`${
+				one.spread && one.spread.samples > 1
+					? `  ${say(one.spread.low, one.unit)}-${say(one.spread.high, one.unit)}` +
+						` over ${one.spread.samples}`
+					: ""
+			}` +
 			`${one.detail ? `  ${one.detail}` : ""}`,
 	);
 
@@ -102,8 +118,12 @@ export function renderVitals(
 			// A partial capture cannot pass: an observer that never
 			// installed reports nothing, which reads the same as a page
 			// with nothing wrong.
+			// A pass that only holds on the median is not a pass: a
+			// metric that rated poor on any load is worth a look even
+			// when the middle run was fine.
 			standing:
-				missing.length > 0 && overall(measures) === "pass"
+				(missing.length > 0 || unstable.length > 0) &&
+				overall(measures) === "pass"
 					? "warn"
 					: overall(measures),
 			headline:

@@ -72,6 +72,15 @@ export {
 } from "./contrast.js";
 export { overallOf, type Part, renderHealth } from "./health.js";
 export {
+	analyseMotion,
+	BRIEF_MS,
+	MOTION_CAPTURE,
+	type MotionAnimation,
+	type MotionCapture,
+	type MotionVideo,
+	PAUSE_STOP_HIDE_MS,
+} from "./motion.js";
+export {
 	foldPair,
 	type PaintedSide,
 	type PairReport,

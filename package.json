@@ -1,17 +1,19 @@
 {
 	"name": "@jitsusama/agentic-harness.core",
-	"version": "0.1.0",
+	"version": "0.2.0",
 	"description": "Pi-agnostic business logic for agentic-harness: state machines, guardian decisions, quest/TDD domain model.",
 	"license": "MIT",
 	"type": "module",
-	"packageManager": "pnpm@10.28.0",
+	"overrides": {
+		"google-auth-library": "$google-auth-library"
+	},
 	"pnpm": {
-		"onlyBuiltDependencies": [
-			"sqlite3"
-		],
 		"overrides": {
 			"google-auth-library": "$google-auth-library"
-		}
+		},
+		"onlyBuiltDependencies": [
+			"sqlite3"
+		]
 	},
 	"exports": {
 		"./tdd": "./dist/tdd/index.js",
@@ -79,6 +81,7 @@
 		"./web/environment": "./dist/web/environment/index.js",
 		"./web/environment/devices": "./dist/web/environment/devices.js",
 		"./web/evaluate": "./dist/web/evaluate/index.js",
+		"./web/hydration": "./dist/web/hydration/index.js",
 		"./web/input": "./dist/web/input/index.js",
 		"./web/mermaid": "./dist/web/mermaid.js",
 		"./web/perf": "./dist/web/perf/index.js",
@@ -111,11 +114,11 @@
 	],
 	"scripts": {
 		"build": "tsc -p tsconfig.build.json",
-		"prepare": "pnpm run build",
+		"prepare": "tsc -p tsconfig.build.json",
 		"lint": "biome check .",
 		"lint:fix": "biome check --write .",
 		"typecheck": "tsc --noEmit",
-		"pretest": "pnpm run build",
+		"pretest": "tsc -p tsconfig.build.json",
 		"test": "vitest run",
 		"test:watch": "vitest",
 		"test:browser": "vitest run --config vitest.browser.config.ts"

@@ -21,6 +21,7 @@
  * - `envelope/`  paging, budgets and the on-disk artifact sink
  * - `environment/` emulation, storage, network shaping, status
  * - `evaluate/`  running an expression and surviving the result
+ * - `hydration/` whether the server render survived hydration
  * - `input/`     key chords, pointer paths, touch gestures
  * - `perf/`      web vitals from the browser's own observers
  * - `snapshot/`  the whole page flattened, frames and shadow
